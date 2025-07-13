@@ -2,16 +2,56 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tic-Tac-Toe with Threat Detection AI</title>
+  <!-- Full-screen on iOS when added to Home Screen -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Responsive 10×10 Tic-Tac-Toe with Smart AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { font-family:'Inter',sans-serif; background:#fff; color:#333; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-    .game-container { background:#fff; border-radius:1rem; padding:1.5rem; box-shadow:0 10px 15px rgba(0,0,0,0.1); display:flex; flex-direction:column; align-items:center; }
-    canvas { border:1px solid #e2e8f0; border-radius:.5rem; margin-bottom:1rem; }
-    .status-message { margin-bottom:.5rem; font-size:1.25rem; font-weight:bold; }
-    button { background:#4299e1; color:#fff; padding:.75rem 1.5rem; border:none; border-radius:.5rem; font-weight:bold; cursor:pointer; }
-    button:hover { background:#3182ce; }
+    html, body {
+      margin: 0;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      color: #333;
+      box-sizing: border-box;
+    }
+    .game-container {
+      width: 100%;
+      max-width: 100vw;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    canvas {
+      display: block;
+      width: 100vw;   /* fill viewport width */
+      height: auto;   /* maintain square aspect */
+      max-height: 100vh; /* never overflow vertically */
+      border: 1px solid #e2e8f0;
+      border-radius: .5rem;
+      margin: 0 auto 1rem;
+    }
+    .status-message {
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin-bottom: .5rem;
+    }
+    button {
+      background: #4299e1;
+      color: #fff;
+      padding: .75rem 1.5rem;
+      border: none;
+      border-radius: .5rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover { background: #3182ce; }
   </style>
 </head>
 <body>
@@ -20,255 +60,182 @@
     <canvas id="gameCanvas"></canvas>
     <button id="playAgainButton">Play Again</button>
   </div>
+
   <script>
-    const cellSize = 50,
-          boardSize = 10,    // <-- changed from 15 to 10
-          winLength = 5;
-    const board = new Map();
-    let currentPlayer = 'X', gameOver = false;
+    const boardSize = 10,
+          winLen    = 5;
+    let cellSize, board = new Map(),
+        currentPlayer = 'X', gameOver = false;
 
     const canvas = document.getElementById('gameCanvas'),
-          ctx = canvas.getContext('2d');
-    const statusDisplay = document.getElementById('status');
-    const playAgainButton = document.getElementById('playAgainButton');
+          ctx    = canvas.getContext('2d');
+    const statusDisplay   = document.getElementById('status'),
+          playAgainButton = document.getElementById('playAgainButton');
 
     function resizeCanvas() {
-      canvas.width  = boardSize * cellSize;
-      canvas.height = boardSize * cellSize;
+      // full viewport width → dynamic cell size
+      cellSize = Math.floor(window.innerWidth / boardSize);
+      // set internal resolution
+      canvas.width  = cellSize * boardSize;
+      canvas.height = cellSize * boardSize;
+      // CSS width already 100vw, height auto; max-height ensures no vertical overflow
       drawBoard();
     }
 
     function drawBoard() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // background
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // grid lines
       ctx.strokeStyle = '#ccc';
       ctx.lineWidth = 1;
-
       for (let i = 0; i <= boardSize; i++) {
-        // vertical lines
         ctx.beginPath();
-        ctx.moveTo(i * cellSize, 0);
-        ctx.lineTo(i * cellSize, canvas.height);
+        ctx.moveTo(i*cellSize, 0);
+        ctx.lineTo(i*cellSize, canvas.height);
         ctx.stroke();
-        // horizontal lines
         ctx.beginPath();
-        ctx.moveTo(0, i * cellSize);
-        ctx.lineTo(canvas.width, i * cellSize);
+        ctx.moveTo(0, i*cellSize);
+        ctx.lineTo(canvas.width, i*cellSize);
         ctx.stroke();
       }
-
+      // stones
       board.forEach((p, key) => {
         const [r, c] = key.split(',').map(Number);
         ctx.font = `${cellSize * 0.6}px Arial`;
-        ctx.textAlign = 'center';
+        ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = p === 'X' ? '#dc2626' : '#2563eb';
-        ctx.fillText(p, c * cellSize + cellSize / 2, r * cellSize + cellSize / 2);
+        ctx.fillText(p, c*cellSize + cellSize/2, r*cellSize + cellSize/2);
       });
     }
 
     function updateStatus(msg = null) {
-      statusDisplay.textContent =
-        msg || (gameOver
-          ? `${currentPlayer} wins!`
-          : `It's ${currentPlayer}'s turn!`);
+      statusDisplay.textContent = msg
+        ?? ( gameOver
+             ? `${currentPlayer} wins!`
+             : `It's ${currentPlayer}'s turn!`
+           );
     }
 
     function checkWin(r, c, p) {
       const dirs = [[0,1],[1,0],[1,1],[1,-1]];
-      return dirs.some(([dr, dc]) => {
+      return dirs.some(([dr,dc]) => {
         let cnt = 1;
-        for (let i = 1; i < winLength; i++)
-          if (board.get(`${r+dr*i},${c+dc*i}`) === p) cnt++;
-          else break;
-        for (let i = 1; i < winLength; i++)
-          if (board.get(`${r-dr*i},${c-dc*i}`) === p) cnt++;
-          else break;
-        return cnt >= winLength;
+        for (let i = 1; i < winLen; i++)
+          if (board.get(`${r+dr*i},${c+dc*i}`) === p) cnt++; else break;
+        for (let i = 1; i < winLen; i++)
+          if (board.get(`${r-dr*i},${c-dc*i}`) === p) cnt++; else break;
+        return cnt >= winLen;
       });
     }
 
     function getEmpties() {
-      const e = [];
-      for (let r = 0; r < boardSize; r++) {
-        for (let c = 0; c < boardSize; c++) {
-          if (!board.has(`${r},${c}`)) e.push({ r, c });
-        }
-      }
-      return e;
+      const empties = [];
+      for (let r = 0; r < boardSize; r++)
+        for (let c = 0; c < boardSize; c++)
+          if (!board.has(`${r},${c}`))
+            empties.push({r,c});
+      return empties;
     }
 
-    function getCandidateMoves() {
-      const s = new Set();
-      if (board.size === 0) {
-        const m = Math.floor(boardSize / 2);
-        s.add(`${m},${m}`);
-      } else {
-        board.forEach((_, key) => {
-          const [r, c] = key.split(',').map(Number);
-          for (let dr = -2; dr <= 2; dr++) {
-            for (let dc = -2; dc <= 2; dc++) {
-              const nr = r + dr, nc = c + dc;
-              if (
-                nr >= 0 && nr < boardSize &&
-                nc >= 0 && nc < boardSize &&
-                !board.has(`${nr},${nc}`)
-              ) {
-                s.add(`${nr},${nc}`);
-              }
-            }
-          }
-        });
-      }
-      return [...s].map(str => {
-        const [r, c] = str.split(',').map(Number);
-        return { r, c };
-      });
-    }
-
-    function scorePosition(r, c, p) {
+    function evaluateCell(r, c) {
       let score = 0;
+      const patterns = [
+        {weight:100000, count:winLen},           // five
+        {weight:10000,  count:winLen-1, openEnds:2}, // open-4
+        {weight:5000,   count:winLen-1, openEnds:1}, // half-open-4
+        {weight:1000,   count:winLen-2, openEnds:2}, // open-3
+        {weight:500,    count:winLen-2, openEnds:1}, // half-open-3
+        {weight:100,    count:winLen-3, openEnds:2}, // open-2
+      ];
       const dirs = [[0,1],[1,0],[1,1],[1,-1]];
-      dirs.forEach(([dr, dc]) => {
-        let cnt = 1;
-        for (let i = 1; i < winLength; i++)
-          if (board.get(`${r+dr*i},${c+dc*i}`) === p) cnt++;
-          else break;
-        for (let i = 1; i < winLength; i++)
-          if (board.get(`${r-dr*i},${c-dc*i}`) === p) cnt++;
-          else break;
-        score += cnt;
+
+      patterns.forEach(({weight,count,openEnds}) => {
+        dirs.forEach(([dr,dc]) => {
+          let c1=0, c2=0;
+          // forward “O”
+          for (let i=1; i<count; i++)
+            if (board.get(`${r+dr*i},${c+dc*i}`)==='O') c1++; else break;
+          // backward “O”
+          for (let i=1; i<count; i++)
+            if (board.get(`${r-dr*i},${c-dc*i}`)==='O') c2++; else break;
+          const total = c1 + c2 + 1;
+          let ends = 0;
+          if (!board.has(`${r+dr*c1+dr},${c+dc*c1+dc}`)) ends++;
+          if (!board.has(`${r-dr*c2-dr},${c-dc*c2-dc}`)) ends++;
+          if (total>=count && (openEnds==null || ends>=openEnds))
+            score += weight;
+
+          // same for “X” (blocking weight)
+          c1=c2=0;
+          for (let i=1; i<count; i++)
+            if (board.get(`${r+dr*i},${c+dc*i}`)==='X') c1++; else break;
+          for (let i=1; i<count; i++)
+            if (board.get(`${r-dr*i},${c-dc*i}`)==='X') c2++; else break;
+          const tot2 = c1 + c2 + 1;
+          ends = 0;
+          if (!board.has(`${r+dr*c1+dr},${c+dc*c1+dc}`)) ends++;
+          if (!board.has(`${r-dr*c2-dr},${c-dc*c2-dc}`)) ends++;
+          if (tot2>=count && (openEnds==null || ends>=openEnds))
+            score += weight * 0.9;
+        });
       });
       return score;
     }
 
-    function evaluateBoard() {
-      let val = 0;
-      board.forEach((p, key) => {
-        const [r, c] = key.split(',').map(Number);
-        val += (p === 'O' ? 1 : -1) * scorePosition(r, c, p);
-      });
-      return val;
-    }
-
-    function minimax(depth, isMax, alpha, beta) {
-      if (depth === 0) return evaluateBoard();
-      let best = isMax ? -Infinity : Infinity;
-      for (const { r, c } of getCandidateMoves()) {
-        const key = `${r},${c}`;
-        board.set(key, isMax ? 'O' : 'X');
-        const win = checkWin(r, c, board.get(key));
-        const val = win
-          ? (isMax ? Infinity : -Infinity)
-          : minimax(depth - 1, !isMax, alpha, beta);
-        board.delete(key);
-        if (isMax) {
-          best = Math.max(best, val);
-          alpha = Math.max(alpha, best);
-        } else {
-          best = Math.min(best, val);
-          beta = Math.min(beta, best);
-        }
-        if (beta <= alpha) break;
-      }
-      return best;
-    }
-
-    function findOpponentFork() {
-      for (const { r, c } of getEmpties()) {
-        const key = `${r},${c}`;
-        board.set(key, 'X');
-        let threats = 0;
-        for (const { r: rr, c: cc } of getEmpties()) {
-          const kk = `${rr},${cc}`;
-          board.set(kk, 'X');
-          if (checkWin(rr, cc, 'X')) threats++;
-          board.delete(kk);
-          if (threats > 1) break;
-        }
-        board.delete(key);
-        if (threats > 1) return { r, c };
-      }
-      return null;
-    }
-
     function makeAIMove() {
-      // 1) Win
-      for (const { r, c } of getCandidateMoves()) {
-        const key = `${r},${c}`;
-        board.set(key, 'O');
-        if (checkWin(r, c, 'O')) {
-          board.delete(key);
-          return placeMark(r, c);
+      const empties = getEmpties();
+      if (!empties.length) return;
+
+      // immediate win/block
+      for (const {r,c} of empties) {
+        board.set(`${r},${c}`,'O');
+        if (checkWin(r,c,'O')) { board.delete(`${r},${c}`); return placeMark(r,c); }
+        board.delete(`${r},${c}`);
+
+        board.set(`${r},${c}`,'X');
+        if (checkWin(r,c,'X')) { board.delete(`${r},${c}`); return placeMark(r,c); }
+        board.delete(`${r},${c}`);
+      }
+
+      // pattern scoring
+      let bestScore = -Infinity, bestMove = empties[0];
+      empties.forEach(({r,c}) => {
+        const sc = evaluateCell(r,c);
+        if (sc > bestScore) {
+          bestScore = sc;
+          bestMove = {r,c};
         }
-        board.delete(key);
-      }
-      // 2) Block immediate
-      for (const { r, c } of getCandidateMoves()) {
-        const key = `${r},${c}`;
-        board.set(key, 'X');
-        if (checkWin(r, c, 'X')) {
-          board.delete(key);
-          return placeMark(r, c);
-        }
-        board.delete(key);
-      }
-      // 3) Block forks
-      const fork = findOpponentFork();
-      if (fork) return placeMark(fork.r, fork.c);
-      // 4) Heuristic if too many
-      const cands = getCandidateMoves();
-      if (cands.length > 30) {
-        let bestScore = -Infinity, bestMove = null;
-        cands.forEach(({ r, c }) => {
-          const score = scorePosition(r, c, 'O') * 2
-                      + scorePosition(r, c, 'X');
-          if (score > bestScore) {
-            bestScore = score;
-            bestMove = { r, c };
-          }
-        });
-        if (bestMove) return placeMark(bestMove.r, bestMove.c);
-      }
-      // 5) Minimax
-      let bestVal = -Infinity, bestMove = null;
-      for (const { r, c } of cands) {
-        const key = `${r},${c}`;
-        board.set(key, 'O');
-        const val = checkWin(r, c, 'O')
-                  ? Infinity
-                  : minimax(1, false, -Infinity, Infinity);
-        board.delete(key);
-        if (val > bestVal) {
-          bestVal = val;
-          bestMove = { r, c };
-        }
-      }
-      if (bestMove) placeMark(bestMove.r, bestMove.c);
+      });
+      placeMark(bestMove.r, bestMove.c);
     }
 
-    function placeMark(r, c) {
+    function placeMark(r,c) {
       const key = `${r},${c}`;
       if (gameOver || board.has(key)) return;
       board.set(key, currentPlayer);
-      if (checkWin(r, c, currentPlayer)) {
+      drawBoard();
+
+      if (checkWin(r,c,currentPlayer)) {
         gameOver = true;
         updateStatus(`${currentPlayer} wins!`);
       } else {
-        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        currentPlayer = currentPlayer==='X' ? 'O' : 'X';
         updateStatus();
-        if (currentPlayer === 'O') makeAIMove();
+        if (currentPlayer==='O') {
+          setTimeout(makeAIMove, 50);
+        }
       }
-      drawBoard();
     }
 
     canvas.addEventListener('click', e => {
-      if (gameOver || currentPlayer !== 'X') return;
+      if (gameOver || currentPlayer!=='X') return;
       const rect = canvas.getBoundingClientRect();
       const r = Math.floor((e.clientY - rect.top) / cellSize);
       const c = Math.floor((e.clientX - rect.left) / cellSize);
-      placeMark(r, c);
+      placeMark(r,c);
     });
 
     playAgainButton.addEventListener('click', () => {
@@ -281,7 +248,7 @@
 
     window.addEventListener('resize', resizeCanvas);
 
-    // Initial render
+    // initial setup
     resizeCanvas();
     updateStatus();
   </script>
